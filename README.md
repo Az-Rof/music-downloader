@@ -40,7 +40,7 @@ Then open **http://127.0.0.1:5000** in your browser.
 ### Downloaded File
 ![Downloaded File](screenshoot/Screenshot%202026-09-28%20181137.png)
 
-## �📁 Project Structure
+## Project Structure
 
 ```
 Music Downloader/
