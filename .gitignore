@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+downloads/
+*.log
+_diag_*.py
+_diag_*.out.txt
+.DS_Store

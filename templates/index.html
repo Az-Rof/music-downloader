@@ -1,0 +1,532 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Music Downloader</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎵</text></svg>">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0e1013; --surface: #16191f; --surface-2: #1d2129;
+      --border: #2a2f3a; --text: #e8eaf0; --muted: #9aa3b2;
+      --accent: #1db954; --accent-2: #7c5cff;
+    }
+    body { background: var(--bg); color: var(--text); min-height: 100vh; }
+    .navbar { background: rgba(14,16,19,.88); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); }
+    .navbar-brand { color: var(--text) !important; font-weight: 700; }
+    .language-select { width: auto; min-width: 112px; font-size: .8rem; padding-top: .35rem; padding-bottom: .35rem; }
+    .card-glass { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; }
+    .form-control, .form-select { background: var(--surface-2); border-color: var(--border); color: var(--text); }
+    .form-control:focus, .form-select:focus { background: var(--surface-2); border-color: var(--accent-2); color: var(--text); box-shadow: 0 0 0 .2rem rgba(124,92,255,.2); }
+    .btn-accent { background: linear-gradient(135deg, var(--accent-2), #5a3df0); border: none; color: #fff; font-weight: 600; }
+    .btn-accent:hover { filter: brightness(1.12); color: #fff; }
+    .btn-outline-glass { border-color: var(--border); color: var(--muted); }
+    .btn-outline-glass:hover { border-color: var(--accent); color: var(--accent); background: transparent; }
+    .section-title { font-size: .8rem; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); font-weight: 700; }
+    .song-row { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 12px; }
+    .song-row:hover { background: var(--surface-2); }
+    .song-cover { width: 42px; height: 42px; border-radius: 8px; object-fit: cover; background: var(--surface-2); flex: 0 0 42px; display: flex; align-items: center; justify-content: center; color: var(--muted); }
+    .song-title { font-size: .9rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .song-sub { font-size: .75rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .progress { height: 6px; background: var(--surface-2); border-radius: 3px; }
+    .progress-bar { background: linear-gradient(90deg, var(--accent-2), var(--accent)); }
+    .badge-soft { font-weight: 600; font-size: .7rem; }
+    .badge-done { background: rgba(29,185,84,.15); color: #3ddc7a; }
+    .badge-skip { background: rgba(124,92,255,.15); color: #a892ff; }
+    .badge-err  { background: rgba(255,77,79,.15); color: #ff8f91; }
+    .badge-run  { background: rgba(64,169,255,.15); color: #69b4ff; }
+    .badge-queue{ background: rgba(154,163,178,.15); color: #b6bfcc; }
+    .empty-hint { color: var(--muted); font-size: .85rem; }
+    details.history-item { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: .5rem .9rem; }
+    details.history-item summary { cursor: pointer; list-style: none; }
+    details.history-item summary::-webkit-details-marker { display: none; }
+    .dl-link { color: var(--muted); font-size: 1.05rem; }
+    .dl-link:hover { color: var(--accent); }
+    .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .minw-0 { min-width: 0; }
+    .alert { border-radius: 12px; }
+    code { color: #a892ff; }
+    .log-output { max-height: 320px; overflow: auto; background: #0a0c0f; color: #b8c2d1; border: 1px solid var(--border); border-radius: 10px; padding: .75rem; font: .72rem/1.45 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; word-break: break-word; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar sticky-top">
+  <div class="container py-2 d-flex align-items-center justify-content-between" style="max-width: 780px;">
+    <span class="navbar-brand"><i class="bi bi-music-note-beamed" style="color: var(--accent);"></i> Music&nbsp;Downloader</span>
+    <div class="d-flex align-items-center gap-2">
+      <select class="form-select form-select-sm language-select" id="language-select"
+              aria-label="Language / Bahasa" title="Language / Bahasa">
+        <option value="id">ID | Indonesia</option>
+        <option value="en">ENG | English</option>
+      </select>
+      <button class="btn btn-sm btn-outline-glass" id="btn-open-folder" title="Buka folder hasil unduhan">
+        <i class="bi bi-folder2-open me-1"></i><span data-i18n="openFolder">Buka Folder</span>
+      </button>
+    </div>
+  </div>
+</nav>
+
+<main class="container py-4" style="max-width: 780px;">
+
+  <!-- Link input form -->
+  <div class="card-glass p-4 mb-4">
+    <form id="download-form">
+      <div class="row g-2">
+        <div class="col-12 col-md-7">
+          <input type="text" class="form-control" id="url-input"
+                 placeholder="Tempel link lagu / playlist / album..." autocomplete="off" required>
+        </div>
+        <div class="col-6 col-md-3">
+          <select class="form-select" id="quality-select" title="Kualitas audio">
+            {% for value, label in qualities %}
+            <option value="{{ value }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-6 col-md-2">
+          <button type="submit" class="btn btn-accent w-100" id="btn-submit">
+            <i class="bi bi-download me-1"></i>Unduh
+          </button>
+        </div>
+      </div>
+    </form>
+    <div class="mt-2 empty-hint">
+      <i class="bi bi-link-45deg"></i> <span data-i18n="supportedSources">Mendukung: Spotify (lagu, playlist, album, artis) &amp;
+      YouTube / YouTube Music (lagu, playlist, album)</span>
+    </div>
+    <div id="alert-area" class="mt-2"></div>
+  </div>
+
+  <!-- Active tasks -->
+  <div class="mb-4">
+    <div class="section-title mb-2" data-i18n="activeDownloads">Sedang Berlangsung</div>
+    <div id="active-tasks"></div>
+  </div>
+
+  <!-- History -->
+  <div>
+    <div class="section-title mb-2" data-i18n="downloadHistory">Riwayat Unduhan</div>
+    <div id="history-list"><div class="empty-hint" data-i18n="emptyHistory">Belum ada riwayat. Unduhan yang selesai akan tampil di sini.</div></div>
+  </div>
+
+  <!-- Diagnostic logs -->
+  <div class="card-glass p-3 mt-4">
+    <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+      <div class="section-title mb-0" data-i18n="applicationLogs">Log Aplikasi</div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-sm btn-outline-glass" id="btn-refresh-logs" type="button">
+          <i class="bi bi-arrow-clockwise me-1"></i><span data-i18n="refreshLogs">Refresh</span>
+        </button>
+        <button class="btn btn-sm btn-outline-glass" id="btn-clear-logs" type="button">
+          <i class="bi bi-trash3 me-1"></i><span data-i18n="clearLogs">Bersihkan</span>
+        </button>
+      </div>
+    </div>
+    <div class="empty-hint mb-2" data-i18n="logsHint">Log ini membantu mendiagnosis masalah metadata dan unduhan.</div>
+    <pre id="log-output" class="log-output mb-0" aria-live="polite"></pre>
+  </div>
+
+</main>
+
+<footer class="container pb-4 text-center" style="max-width: 780px;">
+  <div class="empty-hint">
+    <span data-i18n="filesSaved">File tersimpan di folder <code>downloads/</code> — otomatis rapi per Artis &amp; Album.</span><br>
+    <span data-i18n="legalNotice">Gunakan hanya untuk konten bebas hak cipta atau yang Anda miliki lisensinya.</span>
+  </div>
+</footer>
+
+<script>
+  // ================= util =================
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g,
+    c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+  const I18N = {
+    id: {
+      pageTitle: "Music Downloader",
+      openFolder: "Buka Folder",
+      openFolderTitle: "Buka folder hasil unduhan",
+      urlPlaceholder: "Tempel link lagu / playlist / album...",
+      qualityTitle: "Kualitas audio",
+      download: "Unduh",
+      supportedSources: "Mendukung: Spotify (lagu, playlist, album, artis) & YouTube / YouTube Music (lagu, playlist, album)",
+      activeDownloads: "Sedang Berlangsung",
+      downloadHistory: "Riwayat Unduhan",
+      filesSaved: "File tersimpan di folder <code>downloads/</code> — otomatis rapi per Artis & Album.",
+      legalNotice: "Gunakan hanya untuk konten bebas hak cipta atau yang Anda miliki lisensinya.",
+      emptyActive: "Belum ada unduhan berjalan.",
+      emptyHistory: "Belum ada riwayat. Unduhan yang selesai akan tampil di sini.",
+      kind: { track: "Lagu", album: "Album", playlist: "Playlist", artist: "Artis" },
+      task: { pending: "Dalam antrean", resolving: "Membaca link…", downloading: "Mengunduh", done: "Selesai", error: "Gagal" },
+      song: { queued: "Menunggu", resolving: "Membaca metadata", downloading: "Mengunduh", done: "Selesai", skipped: "Dilewati (sudah ada)", error: "Gagal" },
+      qualityAuto: "otomatis", qualitySuffix: "kbps",
+      quality: { auto: "Otomatis (ikuti sumber)", 320: "320 kbps (terbaik)", 256: "256 kbps", 192: "192 kbps", 128: "128 kbps (hemat)" },
+      counts: { done: "selesai", skipped: "dilewati", failed: "gagal" },
+      metadataDone: "Metadata selesai dibaca",
+      metadataReading: "Membaca metadata",
+      downloadStarting: "Mulai mengunduh lagu...",
+      finished: "Selesai",
+      failedDownload: "Gagal mengunduh",
+      saveFile: "Simpan file MP3",
+      alreadyExists: "File sudah ada, tidak diunduh ulang",
+      noTitle: "(tanpa judul)",
+      applicationLogs: "Log Aplikasi",
+      refreshLogs: "Refresh",
+      clearLogs: "Bersihkan",
+      logsHint: "Log ini membantu mendiagnosis masalah metadata dan unduhan.",
+      emptyLogs: "Belum ada log.",
+      clearLogsConfirm: "Bersihkan log aplikasi?"
+    },
+    en: {
+      pageTitle: "Music Downloader",
+      openFolder: "Open Folder",
+      openFolderTitle: "Open download folder",
+      urlPlaceholder: "Paste song / playlist / album link...",
+      qualityTitle: "Audio quality",
+      download: "Download",
+      supportedSources: "Supports: Spotify (songs, playlists, albums, artists) & YouTube / YouTube Music (songs, playlists, albums)",
+      activeDownloads: "In Progress",
+      downloadHistory: "Download History",
+      filesSaved: "Files are saved in <code>downloads/</code> — organized by Artist & Album.",
+      legalNotice: "Only use content that is copyright-free or that you are licensed to use.",
+      emptyActive: "No downloads in progress.",
+      emptyHistory: "No history yet. Completed downloads will appear here.",
+      kind: { track: "Song", album: "Album", playlist: "Playlist", artist: "Artist" },
+      task: { pending: "Queued", resolving: "Reading link…", downloading: "Downloading", done: "Completed", error: "Failed" },
+      song: { queued: "Waiting", resolving: "Reading metadata", downloading: "Downloading", done: "Completed", skipped: "Skipped (already exists)", error: "Failed" },
+      qualityAuto: "auto", qualitySuffix: "kbps",
+      quality: { auto: "Automatic (follow source)", 320: "320 kbps (best)", 256: "256 kbps", 192: "192 kbps", 128: "128 kbps (smaller file)" },
+      counts: { done: "completed", skipped: "skipped", failed: "failed" },
+      metadataDone: "Metadata loaded",
+      metadataReading: "Reading metadata",
+      downloadStarting: "Starting download...",
+      finished: "Completed",
+      failedDownload: "Download failed",
+      saveFile: "Save MP3 file",
+      alreadyExists: "File already exists, download skipped",
+      noTitle: "(untitled)",
+      applicationLogs: "Application Logs",
+      refreshLogs: "Refresh",
+      clearLogs: "Clear",
+      logsHint: "These logs help diagnose metadata and download problems.",
+      emptyLogs: "No logs yet.",
+      clearLogsConfirm: "Clear application logs?"
+    }
+  };
+
+  let language = localStorage.getItem("md-language") || "id";
+  const t = () => I18N[language];
+  const KIND_LABEL = new Proxy({}, { get: (_, key) => t().kind[key] || key });
+
+  function applyLanguage(nextLanguage) {
+    language = nextLanguage === "en" ? "en" : "id";
+    localStorage.setItem("md-language", language);
+    document.documentElement.lang = language;
+    document.title = t().pageTitle;
+    document.getElementById("language-select").value = language;
+    document.querySelectorAll("[data-i18n]").forEach((el) => {
+      const key = el.dataset.i18n;
+      if (t()[key]) el.innerHTML = t()[key];
+    });
+    document.getElementById("url-input").placeholder = t().urlPlaceholder;
+    document.getElementById("quality-select").title = t().qualityTitle;
+    document.querySelectorAll("#quality-select option").forEach((option) => {
+      option.textContent = t().quality[option.value] || option.textContent;
+    });
+    document.getElementById("btn-open-folder").title = t().openFolderTitle;
+    document.getElementById("btn-submit").innerHTML = `<i class="bi bi-download me-1"></i>${t().download}`;
+    renderStaticEmptyStates();
+    loadHistory();
+    loadLogs();
+  }
+
+  function localizedMessage(message) {
+    if (!message) return "";
+    const messages = {
+      "Menyiapkan pembacaan link...": { id: "Menyiapkan pembacaan link...", en: "Preparing to read link..." },
+      "Membaca daftar lagu dari link...": { id: "Membaca daftar lagu dari link...", en: "Reading songs from link..." },
+      "Menghubungi Spotify / YouTube Music...": { id: "Menghubungi Spotify / YouTube Music...", en: "Contacting Spotify / YouTube Music..." },
+      "Mulai mengunduh lagu...": { id: "Mulai mengunduh lagu...", en: "Starting download..." },
+      "Selesai": { id: "Selesai", en: "Completed" },
+      "Gagal": { id: "Gagal", en: "Failed" },
+    };
+    if (messages[message]) return messages[message][language];
+    const metadata = message.match(/^Membaca metadata: (\d+\/\d+) lagu$/);
+    if (metadata) return language === "en"
+      ? `Reading metadata: ${metadata[1]} songs`
+      : message;
+    const loaded = message.match(/^Metadata selesai dibaca: (\d+) lagu$/);
+    if (loaded) return language === "en"
+      ? `Metadata loaded: ${loaded[1]} songs`
+      : message;
+    return message;
+  }
+
+  function renderStaticEmptyStates() {
+    const active = document.getElementById("active-tasks");
+    if (!state.active.size && active) {
+      active.innerHTML = `<div class="empty-hint">${t().emptyActive}</div>`;
+    }
+  }
+
+  const TASK_STATUS = {
+    pending:    { cls: "badge-queue", icon: "bi-hourglass-split" },
+    resolving:  { cls: "badge-run",   icon: "bi-search" },
+    downloading:{ cls: "badge-run",   icon: "bi-arrow-down-circle" },
+    done:       { cls: "badge-done",  icon: "bi-check-circle" },
+    error:      { cls: "badge-err",   icon: "bi-x-circle" },
+  };
+
+  const SONG_STATUS = {
+    queued:      { cls: "badge-queue" },
+    resolving:   { cls: "badge-run" },
+    downloading: { cls: "badge-run" },
+    done:        { cls: "badge-done" },
+    skipped:     { cls: "badge-skip" },
+    error:       { cls: "badge-err" },
+  };
+
+  const state = { active: new Set(), timer: null, logTimer: null };
+
+  // ================= alert =================
+  function alertError(msg) {
+    document.getElementById("alert-area").innerHTML =
+      `<div class="alert alert-danger py-2 px-3 mb-0 small">
+         <i class="bi bi-exclamation-triangle me-1"></i>${esc(msg)}
+       </div>`;
+  }
+  function clearAlert() { document.getElementById("alert-area").innerHTML = ""; }
+
+  // ================= render =================
+  function coverHtml(song) {
+    if (song.cover_url) {
+      return `<img src="${esc(song.cover_url)}" class="song-cover" alt="" loading="lazy"
+                   onerror="this.style.visibility='hidden'">`;
+    }
+    return `<div class="song-cover"><i class="bi bi-vinyl"></i></div>`;
+  }
+
+  function songRow(song) {
+    const st = SONG_STATUS[song.status] || SONG_STATUS.queued;
+    const songLabel = t().song[song.status] || t().song.queued;
+    let right;
+
+    if (song.status === "done" && song.file_path) {
+      right = `<a class="dl-link" href="/api/file?path=${encodeURIComponent(song.file_path)}"
+                  title="${esc(t().saveFile)}"><i class="bi bi-cloud-download"></i></a>`;
+    } else if (song.status === "done") {
+      right = `<span class="badge badge-soft ${st.cls}">${songLabel}</span>`;
+    } else if (song.status === "skipped") {
+      right = `<span class="badge badge-soft ${st.cls}" title="${esc(t().alreadyExists)}">${songLabel}</span>`;
+    } else if (song.status === "error") {
+      right = `<span class="badge badge-soft ${st.cls}" title="${esc(song.error || t().failedDownload)}">${songLabel}</span>`;
+    } else {
+      right = `<div class="progress" style="width: 110px;">
+                 <div class="progress-bar" style="width: ${song.progress}%"></div>
+               </div>`;
+    }
+
+    const sub = [song.artist, song.album].filter(Boolean).join(" — ");
+    return `<div class="song-row">
+              ${coverHtml(song)}
+              <div class="flex-grow-1 minw-0">
+                <div class="song-title">${esc(song.name)}</div>
+                <div class="song-sub">${esc(sub)}</div>
+              </div>
+              <div>${right}</div>
+            </div>`;
+  }
+
+  function taskCard(task) {
+    const st = TASK_STATUS[task.status] || TASK_STATUS.pending;
+    const songOverall = task.total
+      ? Math.round(task.songs.reduce((a, s) => a + s.progress, 0) / task.total)
+      : 0;
+    // Saat resolving, song progress belum selalu tersedia. Gunakan progress
+    // task agar bar tetap bergerak real-time dari 0 sampai 100.
+    const overall = task.status === "resolving" ? (task.progress || 0) : songOverall;
+    const qualityText = t().qualityAuto && task.quality === "auto"
+      ? t().qualityAuto
+      : task.quality + " " + t().qualitySuffix;
+
+    const counts = `
+      <span class="badge badge-soft badge-done me-1"><i class="bi bi-check-lg"></i> ${task.done} ${t().counts.done}</span>
+      <span class="badge badge-soft badge-skip me-1"><i class="bi bi-skip-forward"></i> ${task.skipped} ${t().counts.skipped}</span>
+      <span class="badge badge-soft badge-err me-1"><i class="bi bi-x-lg"></i> ${task.failed} ${t().counts.failed}</span>`;
+
+    return `<div class="card-glass p-3 mb-3" id="task-${esc(task.task_id)}">
+      <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+        <div class="minw-0">
+          <div class="fw-semibold truncate">${esc(task.title || task.url)}</div>
+          <div class="song-sub">${KIND_LABEL[task.kind] || t().kind.track} · ${language === "en" ? "quality" : "kualitas"} ${esc(qualityText)} · ${task.total || "..."} ${language === "en" ? "songs" : "lagu"}</div>
+        </div>
+        <span class="badge badge-soft ${st.cls}"><i class="bi ${st.icon} me-1"></i>${t().task[task.status] || t().task.pending}</span>
+      </div>
+      <div class="progress mb-2"><div class="progress-bar" style="width: ${overall}%"></div></div>
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <div>${counts}</div>
+        <div class="song-sub">${overall}%${task.message ? ` · ${esc(localizedMessage(task.message))}` : ""}</div>
+      </div>
+      ${task.error ? `<div class="alert alert-danger py-2 px-3 mb-2 small">${esc(task.error)}</div>` : ""}
+      <div>${task.songs.map(songRow).join("")}</div>
+    </div>`;
+  }
+
+  function historyItem(task) {
+    const st = TASK_STATUS[task.status] || TASK_STATUS.pending;
+    const date = new Date((task.finished_at || task.created_at) * 1000);
+    return `<details class="history-item mb-2">
+      <summary class="d-flex align-items-center justify-content-between gap-2 py-2">
+        <div class="minw-0">
+          <div class="fw-semibold truncate">${esc(task.title || task.url)}</div>
+          <div class="song-sub">${date.toLocaleString(language === "en" ? "en-US" : "id-ID")} · ${task.total} ${language === "en" ? "songs" : "lagu"} ·
+            ${t().counts.done} ${task.done} · ${t().counts.skipped} ${task.skipped} · ${t().counts.failed} ${task.failed}</div>
+        </div>
+        <span class="badge badge-soft ${st.cls}">${t().task[task.status] || t().task.pending}</span>
+      </summary>
+      <hr style="border-color: var(--border); opacity: .5; margin: .25rem 0 .5rem;">
+      ${task.error ? `<div class="alert alert-danger py-2 px-3 mb-2 small">${esc(task.error)}</div>` : ""}
+      <div>${task.songs.map(songRow).join("")}</div>
+    </details>`;
+  }
+
+  // ================= polling =================
+  async function poll() {
+    let anyFinished = false;
+
+    for (const id of Array.from(state.active)) {
+      try {
+        const res = await fetch(`/api/status/${id}`);
+        if (!res.ok) { state.active.delete(id); continue; }
+        const task = await res.json();
+        const el = document.getElementById(`task-${id}`);
+
+        if (task.status === "done" || task.status === "error") {
+          anyFinished = true;
+          state.active.delete(id);
+          if (el) el.remove();
+        } else if (el) {
+          el.outerHTML = taskCard(task);
+        } else {
+          document.getElementById("active-tasks")
+                  .insertAdjacentHTML("afterbegin", taskCard(task));
+        }
+      } catch (e) { /* connection hiccup — retry on next tick */ }
+    }
+
+    if (state.active.size === 0) {
+      clearInterval(state.timer);
+      state.timer = null;
+      document.getElementById("active-tasks").innerHTML =
+        `<div class="empty-hint">${t().emptyActive}</div>`;
+    }
+    if (anyFinished) loadHistory();
+  }
+
+  function startPolling() {
+    if (!state.timer) state.timer = setInterval(poll, 1000);
+    poll();
+  }
+
+  // ================= history =================
+  async function loadHistory() {
+    try {
+      const res = await fetch("/api/history?limit=20");
+      const data = await res.json();
+      const box = document.getElementById("history-list");
+
+      if (!data.tasks || data.tasks.length === 0) {
+        box.innerHTML = `<div class="empty-hint">${t().emptyHistory}</div>`;
+        return;
+      }
+      box.innerHTML = data.tasks.map(historyItem).join("");
+    } catch (e) { /* ignore */ }
+  }
+
+  // ================= logs =================
+  async function loadLogs() {
+    const output = document.getElementById("log-output");
+    if (!output) return;
+    try {
+      const res = await fetch("/api/logs?limit=300");
+      const data = await res.json();
+      // Use textContent so log content is never rendered as HTML.
+      output.textContent = data.lines && data.lines.length
+        ? data.lines.join("\n")
+        : t().emptyLogs;
+      output.scrollTop = output.scrollHeight;
+    } catch (e) {
+      output.textContent = language === "en"
+        ? "Unable to load logs."
+        : "Tidak dapat memuat log.";
+    }
+  }
+
+  // ================= event =================
+  document.getElementById("download-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const url = document.getElementById("url-input").value.trim();
+    const quality = document.getElementById("quality-select").value;
+    if (!url) return;
+
+    const btn = document.getElementById("btn-submit");
+    btn.disabled = true;
+    try {
+      const res = await fetch("/api/download", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url, quality }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        alertError(data.error || (language === "en" ? "Failed to start download." : "Gagal memulai unduhan."));
+        return;
+      }
+      localStorage.setItem("md-quality", quality);
+      document.getElementById("url-input").value = "";
+      clearAlert();
+      state.active.add(data.task_id);
+      startPolling();
+    } catch (err) {
+      alertError(language === "en"
+        ? "Cannot connect to server. Make sure `python app.py` is running."
+        : "Tidak dapat menghubungi server. Pastikan `python app.py` masih berjalan.");
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  document.getElementById("btn-open-folder").addEventListener("click", async () => {
+    try { await fetch("/api/open-downloads"); } catch (e) { /* ignore */ }
+  });
+
+  document.getElementById("language-select").addEventListener("change", (event) => {
+    applyLanguage(event.target.value);
+  });
+
+  document.getElementById("btn-refresh-logs").addEventListener("click", loadLogs);
+  document.getElementById("btn-clear-logs").addEventListener("click", async () => {
+    if (!confirm(t().clearLogsConfirm)) return;
+    try {
+      const res = await fetch("/api/logs/clear", { method: "POST" });
+      if (res.ok) loadLogs();
+    } catch (e) { /* ignore */ }
+  });
+
+  // ================= init =================
+  const savedQuality = localStorage.getItem("md-quality");
+  if (savedQuality) {
+    document.getElementById("quality-select").value = savedQuality;
+  }
+  document.getElementById("active-tasks").innerHTML =
+    `<div class="empty-hint">${t().emptyActive}</div>`;
+  applyLanguage(language);
+  loadHistory();
+  loadLogs();
+  state.logTimer = setInterval(loadLogs, 3000);
+</script>
+</body>
+</html>
